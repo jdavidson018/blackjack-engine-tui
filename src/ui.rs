@@ -5,6 +5,7 @@ use ratatui::{
     widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Wrap},
     Frame,
 };
+use ratatui::crossterm::cursor::SetCursorStyle::SteadyBar;
 use ratatui::layout::Alignment;
 use ratatui::prelude::Stylize;
 use ratatui::style::Color::Green;
@@ -13,8 +14,19 @@ use ratatui::widgets::canvas;
 use ratatui::widgets::canvas::Canvas;
 use crate::app::{App, CurrentScreen};
 use crate::constants::{MENU_ITEMS, SETTINGS_ITEMS, TITLE};
+use crate::menu::menu_screen::BORDER;
 use crate::playing_card::PlayingCard;
 
+// Renders a border around the entire Rect passed in
+pub fn render_border(frame: &mut Frame, screen: Rect) {
+    let border_block = Block::default()
+        .borders(Borders::all())
+        .style(Style::default().fg(BORDER));
+    let border = Paragraph::new(Text::default())
+        .alignment(Alignment::Center)
+        .block(border_block);
+    frame.render_widget(border, screen)
+}
 pub fn ui(frame: &mut Frame, app: &App) {
     let main_area = frame.area();
     match app.current_screen {

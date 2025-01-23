@@ -9,15 +9,19 @@ use ratatui::{
     Terminal,
 };
 
+mod model;
 mod app;
 mod ui;
 mod constants;
 mod playing_card;
+mod menu;
 
 use crate::{
     app::{App, CurrentScreen},
     ui::ui,
 };
+use crate::menu::menu_screen::MenuScreen;
+use crate::model::{Model, ModelResponse};
 
 fn main() -> Result<(), Box<dyn Error>> {
     // setup terminal
@@ -47,34 +51,21 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<()> {
+    let mut screen: Box<dyn Model> = Box::new(MenuScreen::new());
     loop {
-        terminal.draw(|f| ui(f, app))?;
-        if let Event::Key(key) = event::read()? {
-            if key.kind == event::KeyEventKind::Release {
-                // Skip events that are not KeyEventKind::Press
-                continue;
-            }
-            match key.code {
-                KeyCode::Char('q') => {
-                    return Ok(());
-                }
-                KeyCode::Char('m') => {
-                    app.set_current_screen(CurrentScreen::Menu);
-                }
-                // More cursor down
-                KeyCode::Char('j') | KeyCode::Down => {
-                    app.increment_active_menu_index(1)
-                }
-                // More cursor up
-                KeyCode::Char('k') | KeyCode::Up => {
-                    app.increment_active_menu_index(-1)
-                }
-                KeyCode::Enter => {
-                    app.determine_current_screen();
-                }
-                _ => {}
+        terminal.draw(|f| screen.ui(f))?;
 
+        loop {
+            // This may look like a nested loop, but it prevents unnecessary
+            // re-renders of the terminal ui
+            let response = screen.update();
+            match response {
+                Ok(ModelResponse::Refresh) => break,
+                Ok(ModelResponse::Exit) => return Ok(()),
+                _ => {}
             }
+            break;
+
         }
     }
 }
