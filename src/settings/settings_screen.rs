@@ -1,34 +1,27 @@
-use std::ptr::from_ref;
+use std::fmt::format;
 use ratatui::crossterm::event;
 use ratatui::crossterm::event::{Event, KeyCode};
 use ratatui::Frame;
-use ratatui::layout::{Constraint, Direction, Layout, Rect};
-use ratatui::prelude::{Alignment, Line};
-use ratatui::style::{Color, Stylize};
+use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
+use ratatui::prelude::{Color, Line, Stylize};
 use ratatui::widgets::{Block, Paragraph};
-use crate::constants::{MENU_ITEMS, TITLE};
+use crate::constants::{MENU_ITEMS, SETTINGS_ITEMS, TITLE};
+use crate::menu::menu_screen::MenuScreen;
 use crate::model::{Model, ModelResponse};
 use crate::ui::render_border;
 
-pub const BORDER: Color = Color::White;
-
-const CONTROLS_LIST: [&str; 8] = [
-    "One", "two",
-    "Three", "four",
-    "Five", "six",
-    "Seven", "eight",
-];
-
-pub struct MenuScreen {
-    size_ok: bool, // I don't think I will need this
+pub struct SettingsScreen {
     active_menu_index: i8,
+    number_of_decks_value: i8,
+    number_of_players_value: i8,
 }
 
-impl MenuScreen {
-    pub fn new() -> MenuScreen {
-        MenuScreen {
-            size_ok: false,
+impl SettingsScreen {
+    pub fn new() -> SettingsScreen {
+        SettingsScreen {
             active_menu_index: 0,
+            number_of_decks_value: 6,
+            number_of_players_value: 1, //TODO: Default should be a full table
         }
     }
 
@@ -42,7 +35,7 @@ impl MenuScreen {
     }
 
     fn render_sub_title_block(&self, frame: &mut Frame, rect: Rect) {
-        let sub_title = Paragraph::new("Made by Freeside Software")
+        let sub_title = Paragraph::new("")
             .alignment(Alignment::Center)
             .block(Block::default());
         frame.render_widget(sub_title, rect);
@@ -51,7 +44,7 @@ impl MenuScreen {
     fn render_menu_body(&self, frame: &mut Frame, rect: Rect) {
         let mut menu_body: Vec<Line<'_>> = vec![];
 
-        for (i, item) in MENU_ITEMS.iter().enumerate() {
+        for (i, item) in SETTINGS_ITEMS.iter().enumerate() {
             menu_body.push(Line::from(""));
             let mut text = if self.active_menu_index == i as i8 {
                 "> ".to_string()
@@ -61,11 +54,18 @@ impl MenuScreen {
 
             text.push_str(item);
 
+            if i == 0 {
+                text.push_str(format!(": < {} >", self.number_of_decks_value).as_str());
+            } else if i == 1 {
+                text.push_str(format!(": < {} >", self.number_of_players_value).as_str());
+            }
+
             if self.active_menu_index == i as i8 {
                 menu_body.push(Line::from(text).fg(Color::Green))
             } else {
                 menu_body.push(Line::from(text));
             }
+
         }
 
         let menu_options = Paragraph::new(menu_body)
@@ -81,14 +81,28 @@ impl MenuScreen {
             return;
         }
         // return if attempting to increment beyond last option
-        if increment > 0 && self.active_menu_index >= (MENU_ITEMS.len() - 1) as i8 {
+        if increment > 0 && self.active_menu_index >= (SETTINGS_ITEMS.len() - 1) as i8 {
             return;
         }
         self.active_menu_index = self.active_menu_index + increment as i8;
     }
+
+    fn increment_current_menu_item(&mut self, increment: i8) {
+        if self.active_menu_index == 0 {
+            if increment < 0 && self.number_of_decks_value < 2 {
+                return;
+            }
+            self.number_of_decks_value += increment;
+        } else if self.active_menu_index == 1 {
+            if increment < 0 && self.number_of_players_value < 2 {
+                return;
+            }
+            self.number_of_players_value += increment;
+        }
+    }
 }
 
-impl Model for MenuScreen {
+impl Model for SettingsScreen {
     fn update(&mut self) -> std::io::Result<ModelResponse> {
         if let Event::Key(key) = event::read()? {
             if key.kind == event::KeyEventKind::Release {
@@ -106,8 +120,20 @@ impl Model for MenuScreen {
                     self.increment_active_menu_index(-1);
                     return Ok(ModelResponse::Refresh);
                 }
-                KeyCode::Enter => {
-                    return Ok(ModelResponse::NavToSettings)
+                // Return to the Menu
+                KeyCode::Char('m') => {
+                    self.increment_active_menu_index(-1);
+                    return Ok(ModelResponse::NavToMainMenu);
+                }
+                // Increment current value up
+                KeyCode::Char('l') | KeyCode::Right => {
+                    self.increment_current_menu_item(1);
+                    return Ok(ModelResponse::Refresh);
+                }
+                // Increment current value down
+                KeyCode::Char('h') | KeyCode::Left => {
+                    self.increment_current_menu_item(-1);
+                    return Ok(ModelResponse::Refresh);
                 }
                 _ => Ok(ModelResponse::Refresh),
             }

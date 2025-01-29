@@ -15,13 +15,16 @@ mod ui;
 mod constants;
 mod playing_card;
 mod menu;
+mod settings;
 
 use crate::{
     app::{App, CurrentScreen},
     ui::ui,
 };
+use crate::menu::menu_screen;
 use crate::menu::menu_screen::MenuScreen;
 use crate::model::{Model, ModelResponse};
+use crate::settings::settings_screen::SettingsScreen;
 
 fn main() -> Result<(), Box<dyn Error>> {
     // setup terminal
@@ -62,6 +65,22 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
             match response {
                 Ok(ModelResponse::Refresh) => break,
                 Ok(ModelResponse::Exit) => return Ok(()),
+                Ok(ModelResponse::NavToMainMenu) => {
+                    screen = Box::new(MenuScreen::new());
+                    break;
+                }
+                Ok(ModelResponse::NavToSettings) => {
+                    screen = Box::new(SettingsScreen::new());
+                    break;
+                }
+                Ok(ModelResponse::NavToTutorial) => {
+                    screen = Box::new(SettingsScreen::new());
+                    break;
+                }
+                Ok(ModelResponse::NavToHighScores) => {
+                    screen = Box::new(SettingsScreen::new());
+                    break;
+                }
                 _ => {}
             }
             break;

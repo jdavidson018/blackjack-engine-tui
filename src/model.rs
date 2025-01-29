@@ -1,5 +1,7 @@
 use std::io;
 use ratatui::Frame;
+use blackjack_engine::game_settings::GameSettings;
+
 #[derive(PartialEq, Debug)]
 pub enum ModelResponse {
     /// Check for another update from the screen model
@@ -8,12 +10,16 @@ pub enum ModelResponse {
     Refresh,
     /// Exit the application
     Exit,
-    /// Switch to a new screen
-    SwitchScreen(u16),
+    /// Switch to Settings Screen
+    NavToSettings,
+    NavToHighScores,
+    NavToTutorial,
+    NavToMainMenu,
+    NavToGame {
+        game_settings: GameSettings,
+    },
     /// QuitGame
     QuitGame,
-    /// ReturnToMainMenu
-    ReturnToMainMenu(u16),
 }
 
 pub trait Model {
