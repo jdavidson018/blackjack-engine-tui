@@ -18,8 +18,7 @@ mod menu;
 mod settings;
 
 use crate::{
-    app::{App, CurrentScreen},
-    ui::ui,
+    app::{App},
 };
 use crate::menu::menu_screen;
 use crate::menu::menu_screen::MenuScreen;

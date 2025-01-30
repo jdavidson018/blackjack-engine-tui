@@ -6,18 +6,38 @@ use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::prelude::{Alignment, Line};
 use ratatui::style::{Color, Stylize};
 use ratatui::widgets::{Block, Paragraph};
-use crate::constants::{MENU_ITEMS, TITLE};
+use crate::menu::menu_screen::MainMenuOption::{Continue, HighScores, Play, Settings, Tutorial};
 use crate::model::{Model, ModelResponse};
-use crate::ui::render_border;
+use crate::ui::{render_border, render_sub_title_block, render_title_block, MenuNavigation};
 
-pub const BORDER: Color = Color::White;
+enum MainMenuOption {
+    Play,
+    Continue,
+    Tutorial,
+    HighScores,
+    Settings,
+}
 
-const CONTROLS_LIST: [&str; 8] = [
-    "One", "two",
-    "Three", "four",
-    "Five", "six",
-    "Seven", "eight",
+impl MainMenuOption {
+    pub fn to_string(&self) -> String {
+        match self {
+            Play => "Play".to_string(),
+            Continue => "Continue".to_string(),
+            Tutorial => "Tutorial".to_string(),
+            HighScores => "High Scores".to_string(),
+            Settings => "Settings".to_string(),
+        }
+    }
+}
+
+pub const MAIN_MENU_ITEMS: [MainMenuOption; 5] = [
+    Play,
+    Continue,
+    Tutorial,
+    HighScores,
+    Settings
 ];
+
 
 pub struct MenuScreen {
     size_ok: bool, // I don't think I will need this
@@ -32,26 +52,10 @@ impl MenuScreen {
         }
     }
 
-    fn render_title_block(&self, frame: &mut Frame, rect: Rect) {
-        // Just a placeholder method, rendering may happen in a different
-        // Impl section
-        let title_paragraph = Paragraph::new(TITLE)
-            .alignment(Alignment::Center)
-            .block(Block::default());
-        frame.render_widget(title_paragraph, rect)
-    }
-
-    fn render_sub_title_block(&self, frame: &mut Frame, rect: Rect) {
-        let sub_title = Paragraph::new("Made by Freeside Software")
-            .alignment(Alignment::Center)
-            .block(Block::default());
-        frame.render_widget(sub_title, rect);
-    }
-
     fn render_menu_body(&self, frame: &mut Frame, rect: Rect) {
         let mut menu_body: Vec<Line<'_>> = vec![];
 
-        for (i, item) in MENU_ITEMS.iter().enumerate() {
+        for (i, item) in MAIN_MENU_ITEMS.iter().enumerate() {
             menu_body.push(Line::from(""));
             let mut text = if self.active_menu_index == i as i8 {
                 "> ".to_string()
@@ -59,7 +63,7 @@ impl MenuScreen {
                 String::new()
             };
 
-            text.push_str(item);
+            text.push_str(item.to_string().as_str());
 
             if self.active_menu_index == i as i8 {
                 menu_body.push(Line::from(text).fg(Color::Green))
@@ -74,17 +78,19 @@ impl MenuScreen {
             .block(Block::default());
         frame.render_widget(menu_options, rect);
     }
+}
 
-    fn increment_active_menu_index(&mut self, increment: i8) {
-        // return if attempting to decrement below first option
-        if increment < 0 && self.active_menu_index <= 0 {
-            return;
-        }
-        // return if attempting to increment beyond last option
-        if increment > 0 && self.active_menu_index >= (MENU_ITEMS.len() - 1) as i8 {
-            return;
-        }
-        self.active_menu_index = self.active_menu_index + increment as i8;
+impl MenuNavigation for MenuScreen {
+    fn get_menu_length(&self) -> usize {
+        MAIN_MENU_ITEMS.len()
+    }
+
+    fn get_menu_index(&self) -> i8 {
+        self.active_menu_index
+    }
+
+    fn set_menu_index(&mut self, index: i8) {
+        self.active_menu_index = index
     }
 }
 
@@ -98,12 +104,12 @@ impl Model for MenuScreen {
                 KeyCode::Char('q') => Ok(ModelResponse::Exit),
                 // More cursor down
                 KeyCode::Char('j') | KeyCode::Down => {
-                    self.increment_active_menu_index(1);
+                    self.increment_menu_index(1);
                     return Ok(ModelResponse::Refresh);
                 }
                 // More cursor up
                 KeyCode::Char('k') | KeyCode::Up => {
-                    self.increment_active_menu_index(-1);
+                    self.increment_menu_index(-1);
                     return Ok(ModelResponse::Refresh);
                 }
                 KeyCode::Enter => {
@@ -127,14 +133,13 @@ impl Model for MenuScreen {
                 Constraint::Length(14),
                 Constraint::Length(1),
                 Constraint::Length(4),
+                Constraint::Ratio(2,5),
                 Constraint::Ratio(1,5),
-                Constraint::Ratio(1,5),
-                Constraint::Ratio(1,5)
             ])
             .split(screen);
 
-        self.render_title_block(frame, menu_layout[0]);
-        self.render_sub_title_block(frame, menu_layout[1]);
+        render_title_block(frame, menu_layout[0]);
+        render_sub_title_block(frame, menu_layout[1]);
         self.render_menu_body(frame, menu_layout[3]);
     }
 }

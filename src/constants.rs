@@ -13,14 +13,3 @@ pub const TITLE: &str = concat!(
 "                                                                                                \\______/                               \n",
 );
 
-pub const MENU_ITEMS: [&str; 4] = [
-    "Play",
-    "Tutorial",
-    "High Scores",
-    "Settings",
-];
-
-pub const SETTINGS_ITEMS: [&str; 2] = [
-    "# of Decks",
-    "# of Players",
-];

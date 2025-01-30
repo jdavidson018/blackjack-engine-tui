@@ -5,10 +5,29 @@ use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::prelude::{Color, Line, Stylize};
 use ratatui::widgets::{Block, Paragraph};
-use crate::constants::{MENU_ITEMS, SETTINGS_ITEMS, TITLE};
-use crate::menu::menu_screen::MenuScreen;
+use crate::constants::{TITLE};
 use crate::model::{Model, ModelResponse};
-use crate::ui::render_border;
+use crate::settings::settings_screen::SettingsMenuOption::{NumberOfDecks, NumberOfPlayers};
+use crate::ui::{render_border, render_sub_title_block, render_title_block, MenuNavigation};
+
+enum SettingsMenuOption {
+    NumberOfDecks,
+    NumberOfPlayers
+}
+
+impl SettingsMenuOption {
+    pub fn to_string(&self) -> String {
+        match self {
+            NumberOfDecks => "Number of Decks".to_string(),
+            NumberOfPlayers => "# of Players".to_string()
+        }
+    }
+}
+
+const SETTINGS_ITEMS: [SettingsMenuOption; 2] = [
+    NumberOfDecks,
+    NumberOfPlayers
+];
 
 pub struct SettingsScreen {
     active_menu_index: i8,
@@ -25,22 +44,6 @@ impl SettingsScreen {
         }
     }
 
-    fn render_title_block(&self, frame: &mut Frame, rect: Rect) {
-        // Just a placeholder method, rendering may happen in a different
-        // Impl section
-        let title_paragraph = Paragraph::new(TITLE)
-            .alignment(Alignment::Center)
-            .block(Block::default());
-        frame.render_widget(title_paragraph, rect)
-    }
-
-    fn render_sub_title_block(&self, frame: &mut Frame, rect: Rect) {
-        let sub_title = Paragraph::new("")
-            .alignment(Alignment::Center)
-            .block(Block::default());
-        frame.render_widget(sub_title, rect);
-    }
-
     fn render_menu_body(&self, frame: &mut Frame, rect: Rect) {
         let mut menu_body: Vec<Line<'_>> = vec![];
 
@@ -52,7 +55,7 @@ impl SettingsScreen {
                 String::new()
             };
 
-            text.push_str(item);
+            text.push_str(item.to_string().as_str());
 
             if i == 0 {
                 text.push_str(format!(": < {} >", self.number_of_decks_value).as_str());
@@ -75,30 +78,36 @@ impl SettingsScreen {
         frame.render_widget(menu_options, rect);
     }
 
-    fn increment_active_menu_index(&mut self, increment: i8) {
-        // return if attempting to decrement below first option
-        if increment < 0 && self.active_menu_index <= 0 {
-            return;
+    fn increment_current_menu_item(&mut self, increment: i8) {
+        let menu_item = SETTINGS_ITEMS.get(self.active_menu_index as usize).unwrap();
+        match menu_item {
+            NumberOfDecks => {
+                if increment < 0 && self.number_of_decks_value < 2 {
+                    return;
+                }
+                self.number_of_decks_value += increment;
+            }
+            NumberOfPlayers => {
+                if increment < 0 && self.number_of_players_value < 2 {
+                    return;
+                }
+                self.number_of_players_value += increment;
+            }
         }
-        // return if attempting to increment beyond last option
-        if increment > 0 && self.active_menu_index >= (SETTINGS_ITEMS.len() - 1) as i8 {
-            return;
-        }
-        self.active_menu_index = self.active_menu_index + increment as i8;
+    }
+}
+
+impl MenuNavigation for SettingsScreen {
+    fn get_menu_length(&self) -> usize {
+        SETTINGS_ITEMS.len()
     }
 
-    fn increment_current_menu_item(&mut self, increment: i8) {
-        if self.active_menu_index == 0 {
-            if increment < 0 && self.number_of_decks_value < 2 {
-                return;
-            }
-            self.number_of_decks_value += increment;
-        } else if self.active_menu_index == 1 {
-            if increment < 0 && self.number_of_players_value < 2 {
-                return;
-            }
-            self.number_of_players_value += increment;
-        }
+    fn get_menu_index(&self) -> i8 {
+        self.active_menu_index
+    }
+
+    fn set_menu_index(&mut self, index: i8) {
+        self.active_menu_index = index
     }
 }
 
@@ -112,17 +121,16 @@ impl Model for SettingsScreen {
                 KeyCode::Char('q') => Ok(ModelResponse::Exit),
                 // More cursor down
                 KeyCode::Char('j') | KeyCode::Down => {
-                    self.increment_active_menu_index(1);
+                    self.increment_menu_index(1);
                     return Ok(ModelResponse::Refresh);
                 }
                 // More cursor up
                 KeyCode::Char('k') | KeyCode::Up => {
-                    self.increment_active_menu_index(-1);
+                    self.increment_menu_index(-1);
                     return Ok(ModelResponse::Refresh);
                 }
                 // Return to the Menu
                 KeyCode::Char('m') => {
-                    self.increment_active_menu_index(-1);
                     return Ok(ModelResponse::NavToMainMenu);
                 }
                 // Increment current value up
@@ -159,8 +167,8 @@ impl Model for SettingsScreen {
             ])
             .split(screen);
 
-        self.render_title_block(frame, menu_layout[0]);
-        self.render_sub_title_block(frame, menu_layout[1]);
+        render_title_block(frame, menu_layout[0]);
+        render_sub_title_block(frame, menu_layout[1]);
         self.render_menu_body(frame, menu_layout[3]);
     }
 }
