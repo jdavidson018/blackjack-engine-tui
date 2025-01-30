@@ -1,11 +1,9 @@
-use std::fmt::format;
 use ratatui::crossterm::event;
 use ratatui::crossterm::event::{Event, KeyCode};
 use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::prelude::{Color, Line, Stylize};
 use ratatui::widgets::{Block, Paragraph};
-use crate::constants::{TITLE};
 use crate::model::{Model, ModelResponse};
 use crate::settings::settings_screen::SettingsMenuOption::{NumberOfDecks, NumberOfPlayers};
 use crate::ui::{render_border, render_sub_title_block, render_title_block, MenuNavigation};

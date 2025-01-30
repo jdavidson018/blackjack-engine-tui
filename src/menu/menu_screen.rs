@@ -1,4 +1,3 @@
-use std::ptr::from_ref;
 use ratatui::crossterm::event;
 use ratatui::crossterm::event::{Event, KeyCode};
 use ratatui::Frame;
@@ -30,7 +29,7 @@ impl MainMenuOption {
     }
 }
 
-pub const MAIN_MENU_ITEMS: [MainMenuOption; 5] = [
+const MAIN_MENU_ITEMS: [MainMenuOption; 5] = [
     Play,
     Continue,
     Tutorial,
@@ -40,14 +39,12 @@ pub const MAIN_MENU_ITEMS: [MainMenuOption; 5] = [
 
 
 pub struct MenuScreen {
-    size_ok: bool, // I don't think I will need this
     active_menu_index: i8,
 }
 
 impl MenuScreen {
     pub fn new() -> MenuScreen {
         MenuScreen {
-            size_ok: false,
             active_menu_index: 0,
         }
     }

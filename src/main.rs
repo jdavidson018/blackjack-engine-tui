@@ -1,29 +1,25 @@
-use std::{error::Error, io};
 use ratatui::{
     backend::{Backend, CrosstermBackend},
     crossterm::{
-        event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind},
+        event::{DisableMouseCapture, EnableMouseCapture},
         execute,
         terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     },
     Terminal,
 };
+use std::{error::Error, io};
 
 mod model;
 mod app;
 mod ui;
 mod constants;
-mod playing_card;
 mod menu;
 mod settings;
 
-use crate::{
-    app::{App},
-};
-use crate::menu::menu_screen;
 use crate::menu::menu_screen::MenuScreen;
 use crate::model::{Model, ModelResponse};
 use crate::settings::settings_screen::SettingsScreen;
+use crate::app::App;
 
 fn main() -> Result<(), Box<dyn Error>> {
     // setup terminal

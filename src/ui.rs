@@ -1,5 +1,4 @@
 use ratatui::layout::Alignment;
-use ratatui::prelude::Stylize;
 use ratatui::{
     layout::Rect,
     style::Style,
