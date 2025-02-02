@@ -15,11 +15,13 @@ mod ui;
 mod constants;
 mod menu;
 mod settings;
+mod game;
 
 use crate::menu::menu_screen::MenuScreen;
 use crate::model::{Model, ModelResponse};
 use crate::settings::settings_screen::SettingsScreen;
 use crate::app::App;
+use crate::game::game_screen::GameScreen;
 
 fn main() -> Result<(), Box<dyn Error>> {
     // setup terminal
@@ -62,6 +64,10 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
                 Ok(ModelResponse::Exit) => return Ok(()),
                 Ok(ModelResponse::NavToMainMenu) => {
                     screen = Box::new(MenuScreen::new());
+                    break;
+                }
+                Ok(ModelResponse::NavToGame) => {
+                    screen = Box::new(GameScreen::new());
                     break;
                 }
                 Ok(ModelResponse::NavToSettings) => {

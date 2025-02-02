@@ -75,6 +75,17 @@ impl MenuScreen {
             .block(Block::default());
         frame.render_widget(menu_options, rect);
     }
+
+    fn return_navigation_target(&self) -> ModelResponse {
+        let selected_option = MAIN_MENU_ITEMS.get(self.active_menu_index as usize).unwrap();
+        match selected_option {
+            Continue => ModelResponse::NavToGame,
+            Play => ModelResponse::NavToGame,
+            Settings => ModelResponse::NavToSettings,
+            HighScores => ModelResponse::NavToHighScores,
+            Tutorial => ModelResponse::NavToHighScores,
+        }
+    }
 }
 
 impl MenuNavigation for MenuScreen {
@@ -110,7 +121,7 @@ impl Model for MenuScreen {
                     return Ok(ModelResponse::Refresh);
                 }
                 KeyCode::Enter => {
-                    return Ok(ModelResponse::NavToSettings)
+                    return Ok(self.return_navigation_target());
                 }
                 _ => Ok(ModelResponse::Refresh),
             }

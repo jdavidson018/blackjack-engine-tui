@@ -15,9 +15,7 @@ pub enum ModelResponse {
     NavToHighScores,
     NavToTutorial,
     NavToMainMenu,
-    NavToGame {
-        game_settings: GameSettings,
-    },
+    NavToGame,
     /// QuitGame
     QuitGame,
 }
