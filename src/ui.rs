@@ -46,6 +46,24 @@ pub fn render_bottom_text(frame: &mut Frame, rect: Rect, text: &str) {
     frame.render_widget(paragraph, bottom_rect);
 }
 
+pub fn render_bottom_right_text(frame: &mut Frame, rect: Rect, text: &str) {
+    let paragraph = Paragraph::new(text)
+        .alignment(Alignment::Right)  // Changed to Left alignment
+        .block(Block::default())
+        .wrap(Wrap { trim: true })   // Enable text wrapping
+        .scroll((0, 0));            // Start from top-left
+
+    // Create a new rect for bottom alignment
+    let bottom_rect = Rect {
+        x: rect.x,
+        y: rect.y + rect.height.saturating_sub(1), // Move to bottom, leaving 1 line
+        width: rect.width,
+        height: 1,  // Only use 1 line of height
+    };
+
+    frame.render_widget(paragraph, bottom_rect);
+}
+
 pub fn render_title_block(frame: &mut Frame, rect: Rect) {
     // Just a placeholder method, rendering may happen in a different
     // Impl section
