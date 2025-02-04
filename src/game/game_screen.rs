@@ -115,16 +115,20 @@ impl GameScreen {
                 KeyCode::Char('p') => {
                     self.game.process_player_action(GameAction::Split, 0);
                 },
-                KeyCode::Char('m') | KeyCode::Up => {
+                KeyCode::Char('m') => {
                     return Ok(ModelResponse::NavToMainMenu);
                 }
-                KeyCode::Char('q') | KeyCode::Up => {
+                KeyCode::Char('q') => {
                     return Ok(ModelResponse::Exit);
                 }
                 _ => {}
             }
         }
         Ok(ModelResponse::Refresh)
+    }
+
+    fn render_user_hand(&self, frame: &mut Frame, rect: Rect) {
+
     }
 }
 
@@ -142,17 +146,15 @@ impl Model for GameScreen {
                 self.handle_player_turn()
             }
             GameState::DealerTurn {..} => {
-                return Ok(ModelResponse::Refresh);
+                Ok(ModelResponse::Refresh)
             },
             GameState::RoundComplete {..} => {
-                return Ok(ModelResponse::Refresh);
+                Ok(ModelResponse::Refresh)
             }
         }
     }
 
     fn ui(&mut self, frame: &mut Frame) {
-        let g_state = (*self.game.get_state()).clone();
-
         // We will use the entire screen
         let screen = frame.area();
 
@@ -229,6 +231,7 @@ impl Model for GameScreen {
         render_text(frame, dealer_horizontal[1], " Dealer ");
         render_text(frame, dealer_main_vertical[2], &self.dealer_message);
 
+        self.render_user_hand(frame, players_horizontal[1]);
         render_border(frame, players_horizontal[1]);
         render_text(frame, players_horizontal[1], " Jack ");
         render_bottom_text(frame, players_horizontal[1], format!(" Bet: ${} ", self.user_bet.to_string()).as_str());
