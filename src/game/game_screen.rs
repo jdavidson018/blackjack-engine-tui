@@ -1,4 +1,5 @@
 use std::arch::aarch64::vreinterpret_u8_f32;
+use std::rc::Rc;
 use std::time::Duration;
 use ratatui::crossterm::event;
 use ratatui::crossterm::event::{Event, KeyCode};
@@ -6,6 +7,7 @@ use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use blackjack_engine::game::{Game, GameAction, GameState};
 use blackjack_engine::game_settings::GameSettings;
+use blackjack_engine::hand::Hand;
 use crate::model::{Model, ModelResponse};
 use crate::ui::{render_border, render_bottom_right_text, render_bottom_text, render_footer_spans, render_text};
 
@@ -19,6 +21,160 @@ pub struct GameScreen {
     bankroll: f64,
 }
 
+// Layout-related functions
+impl GameScreen {
+    fn create_main_layout(screen: Rect) ->  Rc<[Rect]> {
+        Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(1),              // Top margin
+                Constraint::Ratio(4, 10),           // Dealer area
+                Constraint::Ratio(4, 10),           // Player area
+                Constraint::Ratio(1, 10),           // Stats/bankroll area
+                Constraint::Length(1),              // Footer
+            ])
+            .split(screen)
+    }
+
+    fn create_dealer_section(dealer_area: Rect) -> (Rc<[Rect]>, Rc<[Rect]>) {
+        Self::create_default_playable_section(dealer_area)
+    }
+
+    fn create_player_section(player_area: Rect) -> (Rc<[Rect]>, Rc<[Rect]>) {
+        Self::create_default_playable_section(player_area)
+    }
+
+    fn create_default_playable_section(playable_area: Rect) -> (Rc<[Rect]>, Rc<[Rect]>) {
+        let horizontal = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([
+                    Constraint::Ratio(2, 10),
+                    Constraint::Ratio(6, 10),
+                    Constraint::Ratio(2, 10),
+                ])
+                .split(playable_area);
+
+        let vertical = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Ratio(3, 10),
+                Constraint::Ratio(3, 10),
+                Constraint::Ratio(3, 10),
+            ])
+            .split(horizontal[1]);
+
+        (horizontal, vertical)
+    }
+
+
+
+    fn create_stats_section(stats_area: Rect) -> Rc<[Rect]> {
+        Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Ratio(1, 20),           // Left margin
+                Constraint::Ratio(6, 20),           // Stats 1
+                Constraint::Ratio(6, 20),           // Stats 2
+                Constraint::Ratio(6, 20),           // Stats 3
+                Constraint::Ratio(1, 20),           // Right margin
+            ])
+            .split(stats_area)
+    }
+
+    fn create_footer_section(footer_area: Rect) -> Rc<[Rect]> {
+        Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Length(1),              // Left margin
+                Constraint::Min(10),                // Footer content
+                Constraint::Length(1),              // Right margin
+            ])
+            .split(footer_area)
+    }
+}
+
+// Rendering-related functions
+impl GameScreen {
+    fn render_dealer_section(&self, frame: &mut Frame, dealer_wrapper: Rc<[Rect]>, dealer_rect: Rc<[Rect]>) {
+        render_border(frame, dealer_wrapper[1]);
+        render_text(frame, dealer_wrapper[1], " Dealer ");
+        render_text(frame, dealer_rect[2], &self.dealer_message);
+    }
+
+    fn render_player_section(&self, frame: &mut Frame, player_wrapper: Rc<[Rect]>, player_rect: Rc<[Rect]>) {
+        render_border(frame, player_wrapper[1]);
+        render_text(frame, player_wrapper[1], " Jack ");
+        render_bottom_text(frame, player_wrapper[1], format!(" Bet: ${} ", self.user_bet.to_string()).as_str());
+        render_bottom_right_text(frame, player_wrapper[1], format!(" Bank: ${} ", self.bankroll.to_string()).as_str());
+
+        self.render_player_hands(frame, player_rect);
+    }
+
+    fn render_player_hands(&self, frame: &mut Frame, player_vertical: Rc<[Rect]>) {
+        match (*self.game.get_state()).clone() {
+            GameState::WaitingForBet { .. } => {
+                render_text(frame, player_vertical[1],
+                            format!("{}{}{}",
+                                    self.input_prompt,
+                                    if self.user_bet == 0f64 { String::new() } else { self.user_bet.to_string() },
+                                    self.cursor_string,
+                            ).as_str()
+                );
+            },
+            GameState::PlayerTurn { player_hands, active_hand_index, .. } => {
+                if player_hands.is_empty() {
+                    render_text(frame, player_vertical[1], "No Cards");
+                    return;
+                }
+
+                for (i, hand) in player_hands.iter().enumerate() {
+                    let hand_text = match &hand.outcome {
+                        Some(outcome) => {
+                            if i == active_hand_index {
+                                format!("Cards {} - {} <", hand.to_string(), outcome.to_string().as_str())
+                            } else {
+                                format!("Cards {} - {}", hand.to_string(), outcome.to_string().as_str())
+                            }
+                        },
+                        None => {
+                            if i == active_hand_index {
+                                format!("Cards {} <", hand.to_string())
+                            } else {
+                                format!("Cards {}", hand.to_string())
+                            }
+                        },
+                    };
+                    render_text(frame, player_vertical[i + 1], &hand_text);
+                }
+            },
+            GameState::DealerTurn { player_hands, ..} | GameState::RoundComplete {player_hands, ..}=> {
+                if player_hands.is_empty() {
+                    render_text(frame, player_vertical[1], "No Cards");
+                    return;
+                }
+
+                for (i, hand) in player_hands.iter().enumerate() {
+                    let hand_text = match &hand.outcome {
+                        Some(outcome) => {
+                            format!("Cards {} - {}", hand.to_string(), outcome.to_string().as_str())
+                        },
+                        None => {
+                            format!("Cards {}", hand.to_string())
+                        },
+                    };
+                    render_text(frame, player_vertical[i + 1], &hand_text);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn render_stats_section(&self, frame: &mut Frame, stats_rects: Rc<[Rect]>) {
+        for rect in &stats_rects[0..=4] {
+            render_border(frame, *rect);
+        }
+    }
+}
 impl GameScreen {
     pub fn new() -> GameScreen {
         let mut game = Game::new(
@@ -126,10 +282,6 @@ impl GameScreen {
         }
         Ok(ModelResponse::Refresh)
     }
-
-    fn render_user_hand(&self, frame: &mut Frame, rect: Rect) {
-
-    }
 }
 
 impl Model for GameScreen {
@@ -155,145 +307,19 @@ impl Model for GameScreen {
     }
 
     fn ui(&mut self, frame: &mut Frame) {
-        // We will use the entire screen
         let screen = frame.area();
+        let screen_layout = Self::create_main_layout(screen);
 
-        // break the screen into chunks
-        let screen_layout = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(1),
-                Constraint::Ratio(4, 10),
-                Constraint::Ratio(4, 10),
-                Constraint::Ratio(1, 10),
-                Constraint::Length(1),
-            ])
-            .split(screen);
+        let (dealer_horizontal, dealer_vertical) = Self::create_dealer_section(screen_layout[1]);
+        self.render_dealer_section(frame, dealer_horizontal, dealer_vertical);
 
-        let dealer_horizontal = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([
-                Constraint::Ratio(2, 10),
-                Constraint::Ratio(6, 10),
-                Constraint::Ratio(2, 10)
-            ])
-            .split(screen_layout[1]);
+        let (player_horizontal, player_vertical) = Self::create_player_section(screen_layout[2]);
+        self.render_player_section(frame, player_horizontal, player_vertical);
 
-        let dealer_main_vertical = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Ratio(3, 10),
-                Constraint::Ratio(3, 10),
-                Constraint::Ratio(3, 10),
-            ])
-            .split(dealer_horizontal[1]);
+        let stats_section = Self::create_stats_section(screen_layout[3]);
+        self.render_stats_section(frame, stats_section);
 
-        let players_horizontal = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([
-                Constraint::Ratio(2, 10),
-                Constraint::Ratio(6, 10),
-                Constraint::Ratio(2, 10)
-            ])
-            .split(screen_layout[2]);
-
-        let player_main_vertical = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Ratio(3, 10),
-                Constraint::Ratio(3, 10),
-                Constraint::Ratio(3, 10),
-            ])
-            .split(players_horizontal[1]);
-
-        let bankroll_and_stats_horizontal = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([
-                Constraint::Ratio(1, 20),
-                Constraint::Ratio(6, 20),
-                Constraint::Ratio(6, 20),
-                Constraint::Ratio(6, 20),
-                Constraint::Ratio(1, 20)
-            ])
-            .split(screen_layout[3]);
-
-        let footer = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([
-                Constraint::Length(1),
-                Constraint::Min(10),
-                Constraint::Length(1),
-            ])
-            .split(screen_layout[4]);
-
-
-        render_border(frame, dealer_horizontal[1]);
-        render_text(frame, dealer_horizontal[1], " Dealer ");
-        render_text(frame, dealer_main_vertical[2], &self.dealer_message);
-
-        self.render_user_hand(frame, players_horizontal[1]);
-        render_border(frame, players_horizontal[1]);
-        render_text(frame, players_horizontal[1], " Jack ");
-        render_bottom_text(frame, players_horizontal[1], format!(" Bet: ${} ", self.user_bet.to_string()).as_str());
-        render_bottom_right_text(frame, players_horizontal[1], format!(" Bank: ${} ", self.bankroll.to_string()).as_str());
-
-        let g_state = (*self.game.get_state()).clone();
-        match g_state {
-            GameState::WaitingForBet { player_bankroll } => {
-                render_text(frame, player_main_vertical[1],
-                            format!("{}{}{}",
-                                    self.input_prompt.to_string(),
-                                    if self.user_bet == 0f64 { String::from("") } else { self.user_bet.to_string() },
-                                    self.cursor_string.to_string(),
-                            ).as_str());
-            },
-            GameState::WaitingToDeal {player_bet, player_bankroll} => {},
-            GameState::PlayerTurn {player_hands, active_hand_index, ..} => {
-                if player_hands.is_empty() {
-                    render_text(frame, player_main_vertical[1], "No Cards");
-                } else {
-                    for (i, hand) in player_hands.iter().enumerate() {
-                        match &hand.outcome {
-                            Some(outcome) => {
-                                if i == active_hand_index {
-                                    render_text(frame,
-                                                player_main_vertical[i + 1],
-                                                format!("Cards {} - {} <", hand.to_string(), outcome.to_string()).as_str()
-                                    );
-                                } else {
-                                    render_text(frame,
-                                                player_main_vertical[i + 1],
-                                                format!("Cards {} - {}", hand.to_string(), outcome.to_string()).as_str()
-                                    );
-                                }
-                            },
-                            None => {
-                                if i == active_hand_index {
-                                    render_text(frame,
-                                                player_main_vertical[i + 1],
-                                                format!("Cards {} <", hand.to_string()).as_str()
-                                    );
-                                } else {
-                                    render_text(frame,
-                                                player_main_vertical[i + 1],
-                                                format!("Cards {}", hand.to_string()).as_str()
-                                    );
-                                }
-                            },
-                        }
-                    }
-                }
-            },
-            GameState::DealerTurn {..} => {},
-            GameState::RoundComplete {..} => {}
-        }
-
-        render_border(frame, bankroll_and_stats_horizontal[0]);
-        render_border(frame, bankroll_and_stats_horizontal[1]);
-        render_border(frame, bankroll_and_stats_horizontal[2]);
-        render_border(frame, bankroll_and_stats_horizontal[3]);
-        render_border(frame, bankroll_and_stats_horizontal[4]);
-
+        let footer = Self::create_footer_section(screen_layout[4]);
         render_footer_spans(frame, vec![], footer[1]);
     }
 }
