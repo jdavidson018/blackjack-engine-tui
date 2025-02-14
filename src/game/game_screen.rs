@@ -1,5 +1,6 @@
 use std::arch::aarch64::vreinterpret_u8_f32;
 use std::rc::Rc;
+use std::thread::sleep;
 use std::time::Duration;
 use ratatui::crossterm::event;
 use ratatui::crossterm::event::{Event, KeyCode};
@@ -95,12 +96,6 @@ impl GameScreen {
 
 // Rendering-related functions
 impl GameScreen {
-    fn render_dealer_section(&self, frame: &mut Frame, dealer_wrapper: Rc<[Rect]>, dealer_rect: Rc<[Rect]>) {
-        render_border(frame, dealer_wrapper[1]);
-        render_text(frame, dealer_wrapper[1], " Dealer ");
-        render_text(frame, dealer_rect[2], &self.dealer_message);
-    }
-
     fn render_player_section(&self, frame: &mut Frame, player_wrapper: Rc<[Rect]>, player_rect: Rc<[Rect]>) {
         render_border(frame, player_wrapper[1]);
         render_text(frame, player_wrapper[1], " Jack ");
@@ -174,7 +169,39 @@ impl GameScreen {
             render_border(frame, *rect);
         }
     }
+
 }
+
+// Rendering-Dealer functions
+impl GameScreen {
+    fn render_dealer_section(&self, frame: &mut Frame, dealer_wrapper: Rc<[Rect]>, dealer_rect: Rc<[Rect]>) {
+        render_border(frame, dealer_wrapper[1]);
+        match (*self.game.get_state()).clone() {
+            GameState::WaitingForBet { .. } => {
+                render_text(frame, dealer_rect[1], "Place your bet");
+            },
+            GameState::PlayerTurn { dealer_hand, .. } => {
+                render_text(frame, dealer_rect[1], "Make your moves");
+                self.render_hand(frame, dealer_rect[2], Hand::with_card(dealer_hand.cards[0].clone()));
+            },
+            GameState::RoundComplete { dealer_hand, .. } => {
+                render_text(frame, dealer_rect[1], "All done");
+                self.render_hand(frame, dealer_rect[2], dealer_hand);
+            },
+            GameState::DealerTurn { dealer_hand, .. } | GameState::RoundComplete {dealer_hand, ..} => {
+                render_text(frame, dealer_rect[1], "Looks like I'm up");
+                self.render_hand(frame, dealer_rect[2], dealer_hand);
+            },
+            _ => {}
+        }
+    }
+
+    fn render_hand(&self, frame: &mut Frame, rect: Rect, hand: Hand) {
+        let hand_text = hand.to_string();
+        render_text(frame, rect, &hand_text);
+    }
+}
+
 impl GameScreen {
     pub fn new() -> GameScreen {
         let mut game = Game::new(
@@ -226,9 +253,14 @@ impl GameScreen {
                             }
                         }
                         Ok(ModelResponse::Refresh)
-                    }
+                    },
+                    KeyCode::Backspace => {
+                        self.user_bet = (self.user_bet / 10f64).floor();
+                        Ok(ModelResponse::Refresh)
+                    },
                     KeyCode::Enter => {
                         self.game.accept_user_bet(self.user_bet);
+                        self.bankroll = self.bankroll - self.user_bet;
                         Ok(ModelResponse::Refresh)
                     },
                     KeyCode::Char('m') | KeyCode::Up => {
@@ -282,6 +314,31 @@ impl GameScreen {
         }
         Ok(ModelResponse::Refresh)
     }
+
+    pub fn handle_dealer_turn(&mut self) -> std::io::Result<ModelResponse> {
+        self.game.next_dealer_turn();
+        Ok(ModelResponse::Refresh)
+    }
+
+    pub fn handle_round_complete(&mut self, bankroll: f64) -> std::io::Result<ModelResponse> {
+        self.bankroll = bankroll;
+        if let Event::Key(key) = event::read()? {
+            if key.kind == event::KeyEventKind::Release {
+                return Ok(ModelResponse::Refresh);
+            }
+            match key.code {
+                KeyCode::Enter | KeyCode::Char('y') => {
+                    self.game.next_round();
+                    return Ok(ModelResponse::Refresh);
+                }
+                KeyCode::Char('n') => {
+                    return Ok(ModelResponse::Exit);
+                }
+                _ => {}
+            }
+        }
+        Ok(ModelResponse::Refresh)
+    }
 }
 
 impl Model for GameScreen {
@@ -298,10 +355,11 @@ impl Model for GameScreen {
                 self.handle_player_turn()
             }
             GameState::DealerTurn {..} => {
-                Ok(ModelResponse::Refresh)
+                sleep(Duration::from_millis(500));
+                self.handle_dealer_turn()
             },
-            GameState::RoundComplete {..} => {
-                Ok(ModelResponse::Refresh)
+            GameState::RoundComplete {player_bankroll, ..} => {
+                self.handle_round_complete(player_bankroll)
             }
         }
     }
